@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+
+__version__ = '0.1.0'
+__author__ = 'Vladimir Berlev'
+__license__ = 'MIT License'
+
+import argparse
+import enum
+import hashlib
+import logging
+import os
+
+
+class Entry:
+    def __init__(self, name, source, target):
+        assert os.path.isabs(source) and os.path.isabs(target)
+        self.name = name
+        self.source = source
+        self.target = target
+
+    def link(self):
+        if not self.is_set():
+            self.external_backup()
+
+            dirname = os.path.dirname(self.target)
+            if not os.path.exists(dirname):
+                logging.info(f'Making directory: {dirname}')
+                os.makedirs(dirname)
+
+            logging.info(f'Creating symlink: {self.target} -> {self.source}')
+            os.symlink(self.source, self.target)
+        else:
+            logging.error(f'{self.name} is already linked')
+
+    def unlink(self):
+        if self.is_set():
+            logging.info(f'Removing {self.target}')
+            os.remove(self.target)
+
+            self.external_restore()
+        else:
+            logging.error(f'{self.name} is not linked')
+
+    def is_set(self):
+        if os.path.lexists(self.target) and os.path.islink(self.target):
+            return os.readlink(self.target) == self.source
+        else:
+            return False
+
+    def external_exists(self):
+        return (os.path.lexists(self.target) and not self.is_set())
+
+    def external_backup(self):
+        if self.external_exists():
+            name = self.target + '.old'
+            logging.info(f'Moving {self.target} to {name}')
+            os.rename(self.target, name)
+
+    def backup_exists(self):
+        return os.path.lexists(self.target + '.old')
+
+    def external_restore(self):
+        if self.backup_exists():
+            name = self.target + '.old'
+            logging.info(f'Moving {name} to {self.target}')
+            os.rename(name, self.target)
+
+    def __str__(self):
+        has_external = self.external_exists() or self.backup_exists()
+        return f'{"!" if has_external else " "} {"*" if self.is_set() else " "} {self.name}'
+
+
+class App:
+    def __init__(self):
+        self.__entries = dict()
+        try:
+            self.__target = os.environ['HOME']
+        except KeyError:
+            raise Exception('HOME is not set')
+        logging.info(f'Target: {self.__target}')
+
+        self.__source = os.path.join(self.__target, 'dotfiles')
+        logging.info(f'Source: {self.__source}')
+
+        self.__load()
+
+    def __load(self):
+        for dirpath, dirnames, filenames in os.walk(self.__source):
+            for filename in filenames:
+                entry_source = os.path.join(dirpath, filename)
+                entry_name = os.path.relpath(entry_source, self.__source)
+                entry_target = os.path.join(self.__target, entry_name)
+                assert entry_name not in self.__entries, f'duplicated entry {entry_name}'
+                self.__entries[entry_name] = Entry(entry_name, entry_source, entry_target)
+
+    def list(self):
+        for key in self.__entries:
+            print(f'{self.__entries[key]}')
+
+    def link(self, name):
+        if name in self.__entries:
+            self.__entries[name].link()
+        else:
+            logging.error(f'{name} is unknown')
+
+    def unlink(self, name):
+        if name in self.__entries:
+            self.__entries[name].unlink()
+        else:
+            logging.error(f'{name} is unknown')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='rc-files management tool')
+    parser.add_argument('-v', '--verbose', action='store_true')
+    subparsers = parser.add_subparsers(help='some help here')
+
+    parser_list = subparsers.add_parser('list', help='list help')
+    parser_list.set_defaults(func=list)
+
+    parser_link = subparsers.add_parser('link', help='link help')
+    parser_link.add_argument('name', help='name help')
+    parser_link.set_defaults(func=link)
+
+    parser_unlink = subparsers.add_parser('unlink', help='unlink help')
+    parser_unlink.add_argument('name', help='name help')
+    parser_unlink.set_defaults(func=unlink)
+
+    args = parser.parse_args()
+
+    log_level = logging.DEBUG if args.verbose else logging.ERROR
+    logging.basicConfig(level=log_level, format='%(levelname)-6s %(message)s')
+
+    args.func(args)
+
+def list(args):
+    App().list()
+
+def link(args):
+    App().link(args.name)
+
+def unlink(args):
+    App().unlink(args.name)
+
+
+if __name__ == "__main__":
+    main()

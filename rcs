@@ -79,7 +79,7 @@ class App:
             raise Exception('HOME is not set')
         logging.info(f'Target: {self.__target}')
 
-        self.__source = os.path.join(self.__target, 'dotfiles')
+        self.__source = os.path.join(self.__target, 'dotfiles', 'overlay')
         logging.info(f'Source: {self.__source}')
 
         self.__load()

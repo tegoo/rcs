@@ -113,17 +113,17 @@ class App:
 def main():
     parser = argparse.ArgumentParser(description='rc-files management tool')
     parser.add_argument('-v', '--verbose', action='store_true')
-    subparsers = parser.add_subparsers(help='some help here')
+    subparsers = parser.add_subparsers(help='subcommands')
 
-    parser_list = subparsers.add_parser('list', help='list help')
+    parser_list = subparsers.add_parser('list', help='list entries')
     parser_list.set_defaults(func=list)
 
-    parser_link = subparsers.add_parser('link', help='link help')
-    parser_link.add_argument('name', help='name help')
+    parser_link = subparsers.add_parser('link', help='link entry')
+    parser_link.add_argument('name', help='entry name')
     parser_link.set_defaults(func=link)
 
-    parser_unlink = subparsers.add_parser('unlink', help='unlink help')
-    parser_unlink.add_argument('name', help='name help')
+    parser_unlink = subparsers.add_parser('unlink', help='unlink entry')
+    parser_unlink.add_argument('name', help='entry name')
     parser_unlink.set_defaults(func=unlink)
 
     args = parser.parse_args()
